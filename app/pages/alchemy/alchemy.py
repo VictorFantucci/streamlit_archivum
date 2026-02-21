@@ -14,7 +14,6 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 # RELATIVE IMPORTS
 from app.src.data_loader import read_excel_data
 from app.components.filters import dynamic_filters, search_box, diff_text_granular
-from app.pages.character.attributes import toxicity
 
 # ------------------------------------------------------------------------------------------------ #
 # CONSTANTES
@@ -211,7 +210,54 @@ def toxicity_rules() -> None:
     st.subheader("Regras de Toxicidade", divider="grey")
 
     # 📊 CONCEITO E CÁLCULO
-    toxicity()
+    st.markdown(r"""
+
+        A **Toxicidade** representa o limite fisiológico do personagem para consumir substâncias alquímicas sem sofrer efeitos adversos.
+
+        Ela é calculada pela fórmula:
+
+        $$
+        \text{Toxicidade} = \frac{HT \times 4 + IQ \times 3 + ST \times 3}{3}
+        $$
+
+        Sendo:
+
+        - $HT$ = Vitalidade
+        - $IQ$ = Inteligência
+        - $ST$ = Força
+
+    """)
+
+    with st.expander("Exemplo"):
+        st.markdown(r"""
+            Se um personagem possui:
+
+            $$
+            HT = 12
+            $$
+
+            $$
+            IQ = 11
+            $$
+
+            $$
+            ST = 10
+            $$
+
+            Então:
+
+            $$
+            \text{Toxicidade} = \frac{(12 \times 4) + (11 \times 3) + (10 \times 3)}{3}
+            $$
+
+            $$
+            \text{Toxicidade} = \frac{48 + 33 + 30}{3}
+            $$
+
+            $$
+            \text{Toxicidade} = \frac{90}{3} = 37
+            $$
+        """)
 
     # ♻️ RECUPERAÇÃO
     with st.expander("♻️ Recuperação de Toxicidade", expanded=False):
