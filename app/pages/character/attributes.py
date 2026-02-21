@@ -718,26 +718,23 @@ def primary_attributes() -> None:
 # FUNÇÃO MAIN
 
 def main():
-    """
-    Página principal que cria um menu lateral para seleção entre
-    o grimório e a visão simples dos arquétipos.
-    """
-
     df_dict = read_excel_data("attributes.xlsx")
+
+    options = ["Atributos Primários", "Atributos Secundários"]
 
     with st.sidebar:
         st.markdown("### Navegação")
         selection = option_menu(
             menu_title=None,
-            options=["Atributos Primários", "Atributos Secundários"],
+            options=options,
             icons=["1-square-fill", "2-square-fill"],
             default_index=0,
         )
 
     # Roteamento das páginas
-    if selection == "Atributos Primários":
+    if selection == options[0]:
         primary_attributes()
-    elif selection == "Atributos Secundários":
+    elif selection == options[1]:
         secondary_attributes(df_dict)
 
 # ------------------------------------------------------------------------------------------------ #
