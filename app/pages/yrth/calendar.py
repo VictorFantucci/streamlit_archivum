@@ -70,26 +70,15 @@ def main():
     # Inicializa os dados a serem mostrados
     df_months, df_days = read_ytarria_calendar()
 
-
     st.header("📅 Calendário do Mundo de Yrth")
 
-    col_months, col_days = st.columns(2)
+    st.markdown("### Meses do Ano")
+    st.dataframe(
+        df_months,
+        hide_index=True,
+        use_container_width=True
+    )
 
-    with col_months:
-        st.markdown("### Meses do Ano")
-        st.dataframe(
-            df_months,
-            hide_index=True,
-            use_container_width=True
-        )
-
-    with col_days:
-        st.markdown("### Dias da Semana")
-        st.dataframe(
-            df_days,
-            hide_index=True,
-            use_container_width=True
-            )
 
 # ------------------------------------------------------------------------------------------------ #
 main()
