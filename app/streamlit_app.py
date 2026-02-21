@@ -49,7 +49,7 @@ weapons = st.Page(os.path.join(pages_folder, "itens", "weapons.py"),
 
 # Páginas sobre alquimia
 alchemy = st.Page(os.path.join(pages_folder, "alchemy", "alchemy.py"),
-                     title="Alquimia",
+                     title="Consumíveis",
                      icon="⚗️")
 
 # Páginas sobre magia
