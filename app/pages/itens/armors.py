@@ -297,7 +297,7 @@ def armors(df_dict: dict) -> None:
 
     df_armors = df_dict["armors"]
 
-    options = ["Cabeça", "Tronco", "Braços", "Mãos", "Pernas", "Botas"]
+    options = ["Cabeça", "Tronco", "Braços", "Mãos", "Pernas", "Pés"]
 
     st.header("Armaduras", divider="grey")
 
