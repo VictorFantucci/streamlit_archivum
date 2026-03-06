@@ -13,6 +13,27 @@ import os
 utils_directory = os.path.dirname(os.path.dirname(__file__)).rstrip('.')
 
 # ------------------------------------------------------------------------------------------------ #
+# CONSTANTES SOBRE TIERS
+TIER_ORDER = ["Comum", "Boa", "Superior", "Excelente", "Obra-Prima"]
+
+TIER_COLORS = {
+    "Comum": "#374151",
+    "Boa": "#22C55E",
+    "Superior": "#3B82F6",
+    "Excelente": "#A855F7",
+    "Obra-Prima": "#F97316",
+}
+
+TIER_CONFIG = {
+    "Comum": {"min_nh": 8, "divisor": 4},
+    "Boa": {"min_nh": 10, "divisor": 5},
+    "Superior": {"min_nh": 12, "divisor": 6},
+    "Excelente": {"min_nh": 14, "divisor": 7},
+    "Obra-Prima": {"min_nh": 16, "divisor": 16},
+}
+
+
+# ------------------------------------------------------------------------------------------------ #
 # FUNÇÕES
 
 def get_project_folder(folder_name: str = None) -> str:

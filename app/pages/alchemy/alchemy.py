@@ -12,28 +12,9 @@ from streamlit_option_menu import option_menu
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 # RELATIVE IMPORTS
+from app.utils import TIER_CONFIG, TIER_COLORS, TIER_ORDER
 from app.src.data_loader import read_excel_data
 from app.components.filters import dynamic_filters, search_box, diff_text_granular
-
-# ------------------------------------------------------------------------------------------------ #
-# CONSTANTES
-TIER_ORDER = ["Comum", "Boa", "Superior", "Excelente", "Obra-Prima"]
-
-TIER_COLORS = {
-    "Comum": "#374151",
-    "Boa": "#22C55E",
-    "Superior": "#3B82F6",
-    "Excelente": "#A855F7",
-    "Obra-Prima": "#F97316",
-}
-
-TIER_CONFIG = {
-    "Comum": {"min_nh": 8, "divisor": 4},
-    "Boa": {"min_nh": 10, "divisor": 5},
-    "Superior": {"min_nh": 12, "divisor": 6},
-    "Excelente": {"min_nh": 14, "divisor": 7},
-    "Obra-Prima": {"min_nh": 16, "divisor": 16},
-}
 
 # ------------------------------------------------------------------------------------------------ #
 # FUNÇÕES AUXILIARES DAS REGRAS
