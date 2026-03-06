@@ -43,6 +43,10 @@ skills = st.Page(os.path.join(pages_folder, "character", "skills.py"),
                      icon="🛠️")
 
 # Páginas sobre itens
+armors = st.Page(os.path.join(pages_folder, "itens", "armors.py"),
+                     title="Armaduras",
+                     icon="🛡️")
+
 weapons = st.Page(os.path.join(pages_folder, "itens", "weapons.py"),
                      title="Armas",
                      icon="⚔️")
@@ -71,7 +75,7 @@ pg = st.navigation(
     {
         "Archivum": [home],
         "Personagem": [attributes, adv_dis, skills],
-        "Itens": [weapons],
+        "Itens": [armors, weapons],
         "Alquimia": [alchemy],
         "Magia": [grimory],
         "Yrth": [calendar]
