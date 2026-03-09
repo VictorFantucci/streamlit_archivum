@@ -114,29 +114,28 @@ def render_armor_page(df_armors: pd.DataFrame, armor_type: str):
             return str(value)
 
         # ---------- HEADER ----------
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
-            st.write(f"**Nome:** {row['armor_name']}")
-        with col2:
             st.markdown(
                 f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{row['armor_tier']}</span>",
                 unsafe_allow_html=True
             )
+        with col2:
+            st.markdown(f"**Tipo:** {h('armor_type')}", unsafe_allow_html=True)
+
 
         # ---------- CAMPOS ----------
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**Slot:** {h('armor_piece_location')}", unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"**Resistência (DR):** {h('armor_damage_resistence')}", unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
         with col1:
             st.markdown(f"**Preço:** {h('armor_price')} moedas", unsafe_allow_html=True)
         with col2:
             st.markdown(f"**Peso:** {h('armor_weight')} kg", unsafe_allow_html=True)
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown(f"**Slot:** {h('armor_piece_location')}", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"**Tipo:** {h('armor_type')}", unsafe_allow_html=True)
-        with col3:
-            st.markdown(f"**Resistência (DR):** {h('armor_damage_resistence')}", unsafe_allow_html=True)
 
         st.markdown(f"**Descrição:**\n\n{h('armor_description')}", unsafe_allow_html=True)
 
