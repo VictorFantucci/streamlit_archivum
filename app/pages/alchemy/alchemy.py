@@ -368,8 +368,6 @@ def render_consumable_sub_page(df_consumables: pd.DataFrame, consumable_type: st
         # ---------- HEADER ----------
         col1, col2 = st.columns(2)
         with col1:
-            st.write(f"**Nome:** {row['consumable_name']}")
-        with col2:
             st.markdown(
                 f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{row['consumable_tier']}</span>",
                 unsafe_allow_html=True
