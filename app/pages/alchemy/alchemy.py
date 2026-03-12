@@ -307,103 +307,101 @@ def render_consumable_sub_page(df_consumables: pd.DataFrame, consumable_type: st
             .reset_index(drop=True)
         )
 
-        st.subheader(consumable_name)
+        with st.expander(consumable_name):
 
-        tiers_available = [
-            t for t in TIER_ORDER
-            if t in df_consumable["consumable_tier"].astype(str).values
-        ]
+            tiers_available = [
+                t for t in TIER_ORDER
+                if t in df_consumable["consumable_tier"].astype(str).values
+            ]
 
-        if not tiers_available:
-            st.warning("Sem tiers disponíveis")
-            continue
+            if not tiers_available:
+                st.warning("Sem tiers disponíveis")
+                continue
 
-        default_tier = "Comum" if "Comum" in tiers_available else tiers_available[0]
+            default_tier = "Comum" if "Comum" in tiers_available else tiers_available[0]
 
-        # botões
-        try:
-            selected_tier = st.segmented_control(
-                "Tier",
-                options=tiers_available,
-                default=default_tier,
-                key=f"tier_segment_{consumable_name}"
-            )
-        except Exception:
-            selected_tier = st.radio(
-                "Tier",
-                options=tiers_available,
-                index=tiers_available.index(default_tier),
-                horizontal=True,
-                key=f"tier_radio_{consumable_name}"
-            )
+            # botões
+            try:
+                selected_tier = st.segmented_control(
+                    "Tier",
+                    options=tiers_available,
+                    default=default_tier,
+                    key=f"tier_segment_{consumable_name}"
+                )
+            except Exception:
+                selected_tier = st.radio(
+                    "Tier",
+                    options=tiers_available,
+                    index=tiers_available.index(default_tier),
+                    horizontal=True,
+                    key=f"tier_radio_{consumable_name}"
+                )
 
-        row = get_row_by_tier(df_consumable, selected_tier)
-        if row is None:
-            continue
+            row = get_row_by_tier(df_consumable, selected_tier)
+            if row is None:
+                continue
 
-        prev_row = None
-        idx = tiers_available.index(selected_tier)
-        if idx > 0:
-            prev_row = get_row_by_tier(df_consumable, tiers_available[idx - 1])
+            prev_row = None
+            idx = tiers_available.index(selected_tier)
+            if idx > 0:
+                prev_row = get_row_by_tier(df_consumable, tiers_available[idx - 1])
 
-        tier_color = TIER_COLORS.get(str(row["consumable_tier"]), "#374151")
+            tier_color = TIER_COLORS.get(str(row["consumable_tier"]), "#374151")
 
-        def h(field):
-            if prev_row is None:
-                return str(row[field])
+            def h(field):
+                if prev_row is None:
+                    return str(row[field])
 
-            value = row[field]
-            prev = prev_row[field]
+                value = row[field]
+                prev = prev_row[field]
 
-            # textos longos → diff granular
-            if isinstance(value, str):
-                return diff_text_granular(value, prev, tier_color)
+                # textos longos → diff granular
+                if isinstance(value, str):
+                    return diff_text_granular(value, prev, tier_color)
 
-            # valores simples → highlight normal
-            if value != prev:
-                return f"<span style='color:{tier_color}; font-weight:600'>{value}</span>"
+                # valores simples → highlight normal
+                if value != prev:
+                    return f"<span style='color:{tier_color}; font-weight:600'>{value}</span>"
 
-            return str(value)
+                return str(value)
 
-        # ---------- HEADER ----------
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(
-                f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{row['consumable_tier']}</span>",
-                unsafe_allow_html=True
-            )
+            # ---------- HEADER ----------
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(
+                    f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{row['consumable_tier']}</span>",
+                    unsafe_allow_html=True
+                )
 
-        # ---------- CAMPOS ----------
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Categoria:** {h('consumable_category')}", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"**Duração:** {h('consumable_duration')}", unsafe_allow_html=True)
+            # ---------- CAMPOS ----------
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**Categoria:** {h('consumable_category')}", unsafe_allow_html=True)
+            with col2:
+                st.markdown(f"**Duração:** {h('consumable_duration')}", unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Efeito:** {h('consumable_effect')}", unsafe_allow_html=True)
-        with col2:
-            if consumable_type in ("Poções", "Elixires"):
-                st.markdown(f"**Toxicidade:** {h('consumable_toxicity')}", unsafe_allow_html=True)
-            elif consumable_type in ("Venenos"):
-                st.markdown(f"**Métodos de Aplicação:** {h('consumable_method')}", unsafe_allow_html=True)
-            elif consumable_type in ("Bombas"):
-                st.markdown(f"**Área de Efeito:** {h('consumable_effect_area')}", unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**Efeito:** {h('consumable_effect')}", unsafe_allow_html=True)
+            with col2:
+                if consumable_type in ("Poções", "Elixires"):
+                    st.markdown(f"**Toxicidade:** {h('consumable_toxicity')}", unsafe_allow_html=True)
+                elif consumable_type in ("Venenos"):
+                    st.markdown(f"**Métodos de Aplicação:** {h('consumable_method')}", unsafe_allow_html=True)
+                elif consumable_type in ("Bombas"):
+                    st.markdown(f"**Área de Efeito:** {h('consumable_effect_area')}", unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Preço:** {h('consumable_price')} moedas", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"**Peso:** {h('consumable_weight')} kg", unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**Preço:** {h('consumable_price')} moedas", unsafe_allow_html=True)
+            with col2:
+                st.markdown(f"**Peso:** {h('consumable_weight')} kg", unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Descrição:**\n\n{h('consumable_description')}", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"**Observação:**\n\n{h('consumable_observation')}", unsafe_allow_html=True)
-
-        st.markdown("---")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**Descrição:**\n\n{h('consumable_description')}", unsafe_allow_html=True)
+            with col2:
+                st.markdown(f"**Observação:**\n\n{h('consumable_observation')}", unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------------------------ #
 # FUNÇÕES DE VISUALIZAÇÃO DOS CONSUMÍVEIS

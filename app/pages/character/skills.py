@@ -24,32 +24,30 @@ def render_skills_full(df: pd.DataFrame):
 
     for _, row in df_sorted.iterrows():
 
-        st.subheader(f"{row['skill_box_name']}")
+        with st.expander(f"{row['skill_box_name']}"):
 
-        col1, col2 = st.columns(2)
-        with col1: st.write(f"**ID:** {row['skill_id']}")
-        with col2: st.write(f"**Nome:** {row['skill_name']}")
+            col1, col2 = st.columns(2)
+            with col1: st.write(f"**ID:** {row['skill_id']}")
+            with col2: st.write(f"**Nome:** {row['skill_name']}")
 
-        col1, col2 = st.columns(2)
-        with col1: st.write(f"**Categoria:** {row['skill_category']}")
-        with col2:
-            st.write(f"**Tipo:** {'Mental' if row['skill_type'] == 'M' else 'Física'}")
+            col1, col2 = st.columns(2)
+            with col1: st.write(f"**Categoria:** {row['skill_category']}")
+            with col2:
+                st.write(f"**Tipo:** {'Mental' if row['skill_type'] == 'M' else 'Física'}")
 
-        col1, col2 = st.columns(2)
-        with col1: st.write(f"**Dificuldade:** {row['skill_difficulty']}")
-        with col2: st.write(f"**Status Base:** {row['skill_base_status']}")
+            col1, col2 = st.columns(2)
+            with col1: st.write(f"**Dificuldade:** {row['skill_difficulty']}")
+            with col2: st.write(f"**Status Base:** {row['skill_base_status']}")
 
-        col1, col2 = st.columns(2)
-        with col1: st.write(f"**Nível Pré-definido:** {row['skill_pre_defined_level']}")
-        with col2: st.write(f"**Pré-requisitos:** {row['skill_prerequisite']}")
+            col1, col2 = st.columns(2)
+            with col1: st.write(f"**Nível Pré-definido:** {row['skill_pre_defined_level']}")
+            with col2: st.write(f"**Pré-requisitos:** {row['skill_prerequisite']}")
 
-        col1, col2 = st.columns(2)
-        with col1: st.write(f"**Fonte:** {row['skill_source_book']}")
-        with col2: st.write(f"**Página:** {row['skill_source_page']}")
+            col1, col2 = st.columns(2)
+            with col1: st.write(f"**Fonte:** {row['skill_source_book']}")
+            with col2: st.write(f"**Página:** {row['skill_source_page']}")
 
-        st.markdown(f"**Descrição:**\n\n{row['skill_description']}")
-
-        st.markdown("---")
+            st.markdown(f"**Descrição:**\n\n{row['skill_description']}")
 
 def render_skills_list(df: pd.DataFrame):
     """

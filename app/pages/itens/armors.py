@@ -55,91 +55,89 @@ def render_armor_page(df_armors: pd.DataFrame, armor_type: str):
             .reset_index(drop=True)
         )
 
-        st.subheader(armor_name)
+        with st.expander(armor_name):
 
-        tiers_available = [
-            t for t in TIER_ORDER
-            if t in df_armor["armor_tier"].astype(str).values
-        ]
+            tiers_available = [
+                t for t in TIER_ORDER
+                if t in df_armor["armor_tier"].astype(str).values
+            ]
 
-        if not tiers_available:
-            st.warning("Sem tiers disponíveis")
-            continue
+            if not tiers_available:
+                st.warning("Sem tiers disponíveis")
+                continue
 
-        default_tier = "Comum" if "Comum" in tiers_available else tiers_available[0]
+            default_tier = "Comum" if "Comum" in tiers_available else tiers_available[0]
 
-        # botões
-        try:
-            selected_tier = st.segmented_control(
-                "Tier",
-                options=tiers_available,
-                default=default_tier,
-                key=f"tier_segment_{armor_name}"
-            )
-        except Exception:
-            selected_tier = st.radio(
-                "Tier",
-                options=tiers_available,
-                index=tiers_available.index(default_tier),
-                horizontal=True,
-                key=f"tier_radio_{armor_name}"
-            )
+            # botões
+            try:
+                selected_tier = st.segmented_control(
+                    "Tier",
+                    options=tiers_available,
+                    default=default_tier,
+                    key=f"tier_segment_{armor_name}"
+                )
+            except Exception:
+                selected_tier = st.radio(
+                    "Tier",
+                    options=tiers_available,
+                    index=tiers_available.index(default_tier),
+                    horizontal=True,
+                    key=f"tier_radio_{armor_name}"
+                )
 
-        row = get_row_by_tier(df_armor, selected_tier)
-        if row is None:
-            continue
+            row = get_row_by_tier(df_armor, selected_tier)
+            if row is None:
+                continue
 
-        prev_row = None
-        idx = tiers_available.index(selected_tier)
-        if idx > 0:
-            prev_row = get_row_by_tier(df_armor, tiers_available[idx - 1])
+            prev_row = None
+            idx = tiers_available.index(selected_tier)
+            if idx > 0:
+                prev_row = get_row_by_tier(df_armor, tiers_available[idx - 1])
 
-        tier_color = TIER_COLORS.get(str(row["armor_tier"]), "#374151")
+            tier_color = TIER_COLORS.get(str(row["armor_tier"]), "#374151")
 
-        def h(field):
-            if prev_row is None:
-                return str(row[field])
+            def h(field):
+                if prev_row is None:
+                    return str(row[field])
 
-            value = row[field]
-            prev = prev_row[field]
+                value = row[field]
+                prev = prev_row[field]
 
-            # textos longos → diff granular
-            if isinstance(value, str):
-                return diff_text_granular(value, prev, tier_color)
+                # textos longos → diff granular
+                if isinstance(value, str):
+                    return diff_text_granular(value, prev, tier_color)
 
-            # valores simples → highlight normal
-            if value != prev:
-                return f"<span style='color:{tier_color}; font-weight:600'>{value}</span>"
+                # valores simples → highlight normal
+                if value != prev:
+                    return f"<span style='color:{tier_color}; font-weight:600'>{value}</span>"
 
-            return str(value)
+                return str(value)
 
-        # ---------- HEADER ----------
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(
-                f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{row['armor_tier']}</span>",
-                unsafe_allow_html=True
-            )
-        with col2:
-            st.markdown(f"**Tipo:** {h('armor_type')}", unsafe_allow_html=True)
+            # ---------- HEADER ----------
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(
+                    f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{row['armor_tier']}</span>",
+                    unsafe_allow_html=True
+                )
+            with col2:
+                st.markdown(f"**Tipo:** {h('armor_type')}", unsafe_allow_html=True)
 
 
-        # ---------- CAMPOS ----------
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Slot:** {h('armor_piece_location')}", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"**Resistência (DR):** {h('armor_damage_resistence')}", unsafe_allow_html=True)
+            # ---------- CAMPOS ----------
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**Slot:** {h('armor_piece_location')}", unsafe_allow_html=True)
+            with col2:
+                st.markdown(f"**Resistência (DR):** {h('armor_damage_resistence')}", unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Preço:** {h('armor_price')} moedas", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"**Peso:** {h('armor_weight')} kg", unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**Preço:** {h('armor_price')} moedas", unsafe_allow_html=True)
+            with col2:
+                st.markdown(f"**Peso:** {h('armor_weight')} kg", unsafe_allow_html=True)
 
-        st.markdown(f"**Descrição:**\n\n{h('armor_description')}", unsafe_allow_html=True)
-
-        st.markdown("---")
+            st.markdown(f"**Descrição:**\n\n{h('armor_description')}", unsafe_allow_html=True)
 
 def render_armor_selection(df_armors: pd.DataFrame):
 

@@ -23,23 +23,21 @@ def render_view_full(view: str ,df: pd.DataFrame):
 
     for _, row in df_sorted.iterrows():
 
-        st.subheader(f"{row[f'{view}_box_name']}")
+        with st.expander(f"{row[f'{view}_box_name']}"):
 
-        col1, col2 = st.columns(2)
-        with col1: st.write(f"**ID:** {row[f'{view}_id']}")
-        with col2: st.write(f"**Nome:** {row[f'{view}_name']}")
+            col1, col2 = st.columns(2)
+            with col1: st.write(f"**ID:** {row[f'{view}_id']}")
+            with col2: st.write(f"**Nome:** {row[f'{view}_name']}")
 
-        col1, col2 = st.columns(2)
-        with col1: st.write(f"**Custo:** {row[f'{view}_cost']}")
-        with col2: st.write(f"**Tipo:** {row[f'{view}_type']}")
+            col1, col2 = st.columns(2)
+            with col1: st.write(f"**Custo:** {row[f'{view}_cost']}")
+            with col2: st.write(f"**Tipo:** {row[f'{view}_type']}")
 
-        col1, col2 = st.columns(2)
-        with col1: st.write(f"**Fonte:** {row[f'{view}_source_book']}")
-        with col2: st.write(f"**Página:** {row[f'{view}_source_page']}")
+            col1, col2 = st.columns(2)
+            with col1: st.write(f"**Fonte:** {row[f'{view}_source_book']}")
+            with col2: st.write(f"**Página:** {row[f'{view}_source_page']}")
 
-        st.markdown(f"**Descrição:**\n\n{row[f'{view}_description']}")
-
-        st.markdown("---")
+            st.markdown(f"**Descrição:**\n\n{row[f'{view}_description']}")
 
 def render_view_list(view: str, df: pd.DataFrame):
     """
