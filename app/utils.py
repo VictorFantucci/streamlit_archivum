@@ -14,24 +14,61 @@ utils_directory = os.path.dirname(os.path.dirname(__file__)).rstrip('.')
 
 # ------------------------------------------------------------------------------------------------ #
 # CONSTANTES SOBRE TIERS
-TIER_ORDER = ["Comum", "Boa", "Superior", "Excelente", "Obra-Prima"]
+TIER_ORDER = [1, 2, 3, 4, 5]
 
 TIER_COLORS = {
-    "Comum": "#374151",
-    "Boa": "#22C55E",
-    "Superior": "#3B82F6",
-    "Excelente": "#A855F7",
-    "Obra-Prima": "#F97316",
+    1: "#374151",
+    2: "#22C55E",
+    3: "#3B82F6",
+    4: "#A855F7",
+    5: "#F97316",
 }
 
 TIER_CONFIG = {
-    "Comum": {"min_nh": 8, "divisor": 4},
-    "Boa": {"min_nh": 10, "divisor": 5},
-    "Superior": {"min_nh": 12, "divisor": 6},
-    "Excelente": {"min_nh": 14, "divisor": 7},
-    "Obra-Prima": {"min_nh": 16, "divisor": 16},
+    1: {"min_nh": 8, "divisor": 4},
+    2: {"min_nh": 10, "divisor": 5},
+    3: {"min_nh": 12, "divisor": 6},
+    4: {"min_nh": 14, "divisor": 7},
+    5: {"min_nh": 16, "divisor": 16},
 }
 
+TIER_NAME_SETS = {
+
+    "qualidade": {
+        1: "Comum",
+        2: "Boa",
+        3: "Superior",
+        4: "Excelente",
+        5: "Obra-Prima",
+    },
+
+    "raridade": {
+        1: "Comum",
+        2: "Incomum",
+        3: "Raro",
+        4: "Épico",
+        5: "Lendário",
+    },
+
+    "habilidade": {
+        1: "Aprendiz",
+        2: "Experiente",
+        3: "Veterano",
+        4: "Especialista",
+        5: "Mestre",
+    }
+
+}
+
+def tier_name_to_level(name, tier_set):
+    mapping = TIER_NAME_SETS[tier_set]
+    for level, n in mapping.items():
+        if n == name:
+            return level
+    return None
+
+def tier_level_to_name(level, tier_set):
+    return TIER_NAME_SETS[tier_set].get(level, str(level))
 
 # ------------------------------------------------------------------------------------------------ #
 # FUNÇÕES

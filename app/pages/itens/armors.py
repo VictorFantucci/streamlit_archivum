@@ -12,7 +12,9 @@ from streamlit_option_menu import option_menu
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 # RELATIVE IMPORTS
-from app.utils import TIER_CONFIG, TIER_COLORS, TIER_ORDER
+from app.utils import TIER_CONFIG, TIER_COLORS, TIER_ORDER, TIER_NAME_SETS
+DEFAULT_TIER_SET = "qualidade"
+
 from app.src.data_loader import read_excel_data
 from app.components.filters import dynamic_filters, search_box, diff_text_granular
 
@@ -25,21 +27,38 @@ def get_row_by_tier(df: pd.DataFrame, tier: str):
         return None
     return filtered.iloc[0]
 
-def render_armor_page(df_armors: pd.DataFrame, armor_type: str):
+def render_armor_page(
+    df_armors: pd.DataFrame,
+    armor_type: str,
+    tier_set: str = DEFAULT_TIER_SET
+):
 
     df = df_armors.copy()
     df = df.fillna('')
 
-    # normalização (boa prática)
-    df["armor_tier"] = df["armor_tier"].astype(str).str.strip()
+    tier_map = TIER_NAME_SETS[tier_set]
 
-    df["armor_tier"] = pd.Categorical(
-        df["armor_tier"],
+    # -----------------------------
+    # Converter nome -> nível
+    # -----------------------------
+    name_to_level = {v: k for k, v in tier_map.items()}
+
+    df["tier_level"] = (
+        df["armor_tier"]
+        .astype(str)
+        .str.strip()
+        .map(name_to_level)
+    )
+
+    df["tier_level"] = pd.Categorical(
+        df["tier_level"],
         categories=TIER_ORDER,
         ordered=True
     )
 
-    # ordenar por menor id da poção
+    # -----------------------------
+    # ordenar armaduras
+    # -----------------------------
     order = (
         df.groupby("armor_name")["armor_id"]
         .min()
@@ -51,54 +70,88 @@ def render_armor_page(df_armors: pd.DataFrame, armor_type: str):
 
         df_armor = (
             df[df["armor_name"] == armor_name]
-            .sort_values("armor_tier")
+            .sort_values("tier_level")
             .reset_index(drop=True)
         )
 
         with st.expander(armor_name):
 
             tiers_available = [
-                t for t in TIER_ORDER
-                if t in df_armor["armor_tier"].astype(str).values
+                int(t)
+                for t in df_armor["tier_level"]
+                .dropna()
+                .unique()
             ]
+
+            tiers_available = sorted(tiers_available)
 
             if not tiers_available:
                 st.warning("Sem tiers disponíveis")
                 continue
 
-            default_tier = "Comum" if "Comum" in tiers_available else tiers_available[0]
+            tier_labels = [tier_map[t] for t in tiers_available]
 
-            # botões
+            default_level = 1 if 1 in tiers_available else tiers_available[0]
+            default_label = tier_map[default_level]
+
+            # -----------------------------
+            # seleção de tier
+            # -----------------------------
             try:
-                selected_tier = st.segmented_control(
+                selected_label = st.segmented_control(
                     "Tier",
-                    options=tiers_available,
-                    default=default_tier,
+                    options=tier_labels,
+                    default=default_label,
                     key=f"tier_segment_{armor_name}"
                 )
             except Exception:
-                selected_tier = st.radio(
+                selected_label = st.radio(
                     "Tier",
-                    options=tiers_available,
-                    index=tiers_available.index(default_tier),
+                    options=tier_labels,
+                    index=tier_labels.index(default_label),
                     horizontal=True,
                     key=f"tier_radio_{armor_name}"
                 )
 
-            row = get_row_by_tier(df_armor, selected_tier)
-            if row is None:
+            selected_level = name_to_level[selected_label]
+
+            # -----------------------------
+            # linha atual
+            # -----------------------------
+            row = df_armor[df_armor["tier_level"] == selected_level]
+
+            if row.empty:
                 continue
 
+            row = row.iloc[0]
+
+            # -----------------------------
+            # tier anterior
+            # -----------------------------
             prev_row = None
-            idx = tiers_available.index(selected_tier)
+            idx = tiers_available.index(selected_level)
+
             if idx > 0:
-                prev_row = get_row_by_tier(df_armor, tiers_available[idx - 1])
+                prev_level = tiers_available[idx - 1]
+                prev = df_armor[df_armor["tier_level"] == prev_level]
 
-            tier_color = TIER_COLORS.get(str(row["armor_tier"]), "#374151")
+                if not prev.empty:
+                    prev_row = prev.iloc[0]
 
+            tier_color = TIER_COLORS.get(selected_level, "#374151")
+
+            # -----------------------------
+            # highlight helper
+            # -----------------------------
             def h(field):
+
                 if prev_row is None:
-                    return str(row[field])
+                    value = row[field]
+
+                    if isinstance(value, (int, float)):
+                        return f"{float(value):.1f}"
+
+                    return str(value)
 
                 value = row[field]
                 prev = prev_row[field]
@@ -107,33 +160,52 @@ def render_armor_page(df_armors: pd.DataFrame, armor_type: str):
                 if isinstance(value, str):
                     return diff_text_granular(value, prev, tier_color)
 
-                # valores simples → highlight normal
+                # números → round + highlight
+                if isinstance(value, (int, float)):
+                    value_fmt = f"{float(value):.1f}"
+                    prev_fmt = f"{float(prev):.1f}" if isinstance(prev, (int, float)) else prev
+
+                    if value_fmt != prev_fmt:
+                        return f"<span style='color:{tier_color}; font-weight:600'>{value_fmt}</span>"
+
+                    return value_fmt
+
+                # fallback
                 if value != prev:
                     return f"<span style='color:{tier_color}; font-weight:600'>{value}</span>"
 
                 return str(value)
 
-            # ---------- HEADER ----------
+            # -----------------------------
+            # HEADER
+            # -----------------------------
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(
-                    f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{row['armor_tier']}</span>",
+                    f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{tier_map[selected_level]}</span>",
                     unsafe_allow_html=True
                 )
+
             with col2:
                 st.markdown(f"**Tipo:** {h('armor_type')}", unsafe_allow_html=True)
 
-
-            # ---------- CAMPOS ----------
+            # -----------------------------
+            # CAMPOS
+            # -----------------------------
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Slot:** {h('armor_piece_location')}", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Resistência (DR):** {h('armor_damage_resistence')}", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Preço:** {h('armor_price')} moedas", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Peso:** {h('armor_weight')} kg", unsafe_allow_html=True)
 

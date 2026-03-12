@@ -10,7 +10,9 @@ from streamlit_option_menu import option_menu
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 # RELATIVE IMPORTS
-from app.utils import TIER_CONFIG, TIER_COLORS, TIER_ORDER
+from app.utils import TIER_CONFIG, TIER_COLORS, TIER_ORDER, TIER_NAME_SETS
+DEFAULT_TIER_SET = "qualidade"
+
 from app.src.data_loader import read_excel_data
 from app.components.filters import search_box, diff_text_granular
 
@@ -29,27 +31,46 @@ def calculate_hex(length):
         return 1
     return math.floor((length + 1) / 2) + 1
 
-def render_melee_weapons(df_melee: pd.DataFrame):
+def render_melee_weapons(
+    df_melee: pd.DataFrame,
+    tier_set: str = DEFAULT_TIER_SET
+):
     """
-    Renderiza cada arma corpo-a-corpo em modo detalhado, com todos os campos e layout visual expandido.
+    Renderiza cada arma corpo-a-corpo em modo detalhado,
+    com todos os campos e layout visual expandido.
     """
 
     df = df_melee.copy()
     df = df.fillna('')
 
-    # Cria nova coluna de alcance em Hex
+    tier_map = TIER_NAME_SETS[tier_set]
+
+    # -----------------------------
+    # calcular alcance
+    # -----------------------------
     df["weapon_range_hex"] = df["weapon_length"].apply(calculate_hex)
 
-    # normalização (boa prática)
-    df["weapon_tier"] = df["weapon_tier"].astype(str).str.strip()
+    # -----------------------------
+    # converter nome -> nível
+    # -----------------------------
+    name_to_level = {v: k for k, v in tier_map.items()}
 
-    df["weapon_tier"] = pd.Categorical(
-        df["weapon_tier"],
+    df["tier_level"] = (
+        df["weapon_tier"]
+        .astype(str)
+        .str.strip()
+        .map(name_to_level)
+    )
+
+    df["tier_level"] = pd.Categorical(
+        df["tier_level"],
         categories=TIER_ORDER,
         ordered=True
     )
 
-    # ordenar por menor id da poção
+    # -----------------------------
+    # ordenar armas
+    # -----------------------------
     order = (
         df.groupby("weapon_name")["weapon_id"]
         .min()
@@ -61,54 +82,88 @@ def render_melee_weapons(df_melee: pd.DataFrame):
 
         df_weapon = (
             df[df["weapon_name"] == weapon_name]
-            .sort_values("weapon_tier")
+            .sort_values("tier_level")
             .reset_index(drop=True)
         )
 
         with st.expander(weapon_name):
 
             tiers_available = [
-                t for t in TIER_ORDER
-                if t in df_weapon["weapon_tier"].astype(str).values
+                int(t)
+                for t in df_weapon["tier_level"]
+                .dropna()
+                .unique()
             ]
+
+            tiers_available = sorted(tiers_available)
 
             if not tiers_available:
                 st.warning("Sem tiers disponíveis")
                 continue
 
-            default_tier = "Comum" if "Comum" in tiers_available else tiers_available[0]
+            tier_labels = [tier_map[t] for t in tiers_available]
 
-            # botões
+            default_level = 1 if 1 in tiers_available else tiers_available[0]
+            default_label = tier_map[default_level]
+
+            # -----------------------------
+            # seleção de tier
+            # -----------------------------
             try:
-                selected_tier = st.segmented_control(
+                selected_label = st.segmented_control(
                     "Tier",
-                    options=tiers_available,
-                    default=default_tier,
+                    options=tier_labels,
+                    default=default_label,
                     key=f"tier_segment_{weapon_name}"
                 )
             except Exception:
-                selected_tier = st.radio(
+                selected_label = st.radio(
                     "Tier",
-                    options=tiers_available,
-                    index=tiers_available.index(default_tier),
+                    options=tier_labels,
+                    index=tier_labels.index(default_label),
                     horizontal=True,
                     key=f"tier_radio_{weapon_name}"
                 )
 
-            row = get_row_by_tier(df_weapon, selected_tier)
-            if row is None:
+            selected_level = name_to_level[selected_label]
+
+            # -----------------------------
+            # linha atual
+            # -----------------------------
+            row = df_weapon[df_weapon["tier_level"] == selected_level]
+
+            if row.empty:
                 continue
 
+            row = row.iloc[0]
+
+            # -----------------------------
+            # tier anterior
+            # -----------------------------
             prev_row = None
-            idx = tiers_available.index(selected_tier)
+            idx = tiers_available.index(selected_level)
+
             if idx > 0:
-                prev_row = get_row_by_tier(df_weapon, tiers_available[idx - 1])
+                prev_level = tiers_available[idx - 1]
+                prev = df_weapon[df_weapon["tier_level"] == prev_level]
 
-            tier_color = TIER_COLORS.get(str(row["weapon_tier"]), "#374151")
+                if not prev.empty:
+                    prev_row = prev.iloc[0]
 
+            tier_color = TIER_COLORS.get(selected_level, "#374151")
+
+            # -----------------------------
+            # highlight helper
+            # -----------------------------
             def h(field):
+
                 if prev_row is None:
-                    return str(row[field])
+                    value = row[field]
+
+                    if isinstance(value, (int, float)):
+                        return f"{float(value):.1f}"
+
+                    return str(value)
 
                 value = row[field]
                 prev = prev_row[field]
@@ -117,71 +172,113 @@ def render_melee_weapons(df_melee: pd.DataFrame):
                 if isinstance(value, str):
                     return diff_text_granular(value, prev, tier_color)
 
-                # valores simples → highlight normal
+                # números → round + highlight
+                if isinstance(value, (int, float)):
+                    value_fmt = f"{float(value):.1f}"
+                    prev_fmt = f"{float(prev):.1f}" if isinstance(prev, (int, float)) else prev
+
+                    if value_fmt != prev_fmt:
+                        return f"<span style='color:{tier_color}; font-weight:600'>{value_fmt}</span>"
+
+                    return value_fmt
+
+                # fallback
                 if value != prev:
                     return f"<span style='color:{tier_color}; font-weight:600'>{value}</span>"
 
                 return str(value)
 
-            # ---------- HEADER ----------
+            # -----------------------------
+            # HEADER
+            # -----------------------------
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(
-                    f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{row['weapon_tier']}</span>",
+                    f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{tier_map[selected_level]}</span>",
                     unsafe_allow_html=True
                 )
-            with col1:
+
+            with col2:
                 st.markdown(f"**Perícia:** {h('weapon_skill')}", unsafe_allow_html=True)
 
-
-            # ---------- CAMPOS ----------
+            # -----------------------------
+            # CAMPOS
+            # -----------------------------
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Modificador BAL:** {h('weapon_bal_modifier')}", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Modificador GDP:** {h('weapon_gdp_modifier')}", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Peso:** {h('weapon_weight')} kg", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Comprimento:** {h('weapon_length')} m", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Preço:** {h('weapon_price')} moedas", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Alcance:** {h('weapon_range_hex')} Hex", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**ST Mínima:** {h('weapon_min_strength')}", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Tipos de Dano:** {h('weapon_damage_type')}", unsafe_allow_html=True)
 
             st.markdown(f"**Descrição:**\n\n{h('weapon_description')}", unsafe_allow_html=True)
 
-def render_ranged_weapons(df_ranged: pd.DataFrame):
+def render_ranged_weapons(
+    df_ranged: pd.DataFrame,
+    tier_set: str = DEFAULT_TIER_SET
+):
     """
-    Renderiza cada arma de longa distância em modo detalhado, com todos os campos e layout visual expandido.
+    Renderiza cada arma de longa distância em modo detalhado,
+    com todos os campos e layout visual expandido.
     """
 
     df = df_ranged.copy()
     df = df.fillna('')
 
-    # Cria nova coluna de alcance em Hex
+    tier_map = TIER_NAME_SETS[tier_set]
+
+    # -----------------------------
+    # calcular alcance em hex
+    # -----------------------------
     df["weapon_range_hex"] = df["weapon_length"].apply(calculate_hex)
 
-    # normalização (boa prática)
-    df["weapon_tier"] = df["weapon_tier"].astype(str).str.strip()
+    # -----------------------------
+    # converter nome -> nível
+    # -----------------------------
+    name_to_level = {v: k for k, v in tier_map.items()}
 
-    df["weapon_tier"] = pd.Categorical(
-        df["weapon_tier"],
+    df["tier_level"] = (
+        df["weapon_tier"]
+        .astype(str)
+        .str.strip()
+        .map(name_to_level)
+    )
+
+    df["tier_level"] = pd.Categorical(
+        df["tier_level"],
         categories=TIER_ORDER,
         ordered=True
     )
 
-    # ordenar por menor id da poção
+    # -----------------------------
+    # ordenar armas
+    # -----------------------------
     order = (
         df.groupby("weapon_name")["weapon_id"]
         .min()
@@ -193,54 +290,88 @@ def render_ranged_weapons(df_ranged: pd.DataFrame):
 
         df_weapon = (
             df[df["weapon_name"] == weapon_name]
-            .sort_values("weapon_tier")
+            .sort_values("tier_level")
             .reset_index(drop=True)
         )
 
         with st.expander(weapon_name):
 
             tiers_available = [
-                t for t in TIER_ORDER
-                if t in df_weapon["weapon_tier"].astype(str).values
+                int(t)
+                for t in df_weapon["tier_level"]
+                .dropna()
+                .unique()
             ]
+
+            tiers_available = sorted(tiers_available)
 
             if not tiers_available:
                 st.warning("Sem tiers disponíveis")
                 continue
 
-            default_tier = "Comum" if "Comum" in tiers_available else tiers_available[0]
+            tier_labels = [tier_map[t] for t in tiers_available]
 
-            # botões
+            default_level = 1 if 1 in tiers_available else tiers_available[0]
+            default_label = tier_map[default_level]
+
+            # -----------------------------
+            # seleção de tier
+            # -----------------------------
             try:
-                selected_tier = st.segmented_control(
+                selected_label = st.segmented_control(
                     "Tier",
-                    options=tiers_available,
-                    default=default_tier,
+                    options=tier_labels,
+                    default=default_label,
                     key=f"tier_segment_{weapon_name}"
                 )
             except Exception:
-                selected_tier = st.radio(
+                selected_label = st.radio(
                     "Tier",
-                    options=tiers_available,
-                    index=tiers_available.index(default_tier),
+                    options=tier_labels,
+                    index=tier_labels.index(default_label),
                     horizontal=True,
                     key=f"tier_radio_{weapon_name}"
                 )
 
-            row = get_row_by_tier(df_weapon, selected_tier)
-            if row is None:
+            selected_level = name_to_level[selected_label]
+
+            # -----------------------------
+            # linha atual
+            # -----------------------------
+            row = df_weapon[df_weapon["tier_level"] == selected_level]
+
+            if row.empty:
                 continue
 
+            row = row.iloc[0]
+
+            # -----------------------------
+            # tier anterior
+            # -----------------------------
             prev_row = None
-            idx = tiers_available.index(selected_tier)
+            idx = tiers_available.index(selected_level)
+
             if idx > 0:
-                prev_row = get_row_by_tier(df_weapon, tiers_available[idx - 1])
+                prev_level = tiers_available[idx - 1]
+                prev = df_weapon[df_weapon["tier_level"] == prev_level]
 
-            tier_color = TIER_COLORS.get(str(row["weapon_tier"]), "#374151")
+                if not prev.empty:
+                    prev_row = prev.iloc[0]
 
+            tier_color = TIER_COLORS.get(selected_level, "#374151")
+
+            # -----------------------------
+            # highlight helper
+            # -----------------------------
             def h(field):
+
                 if prev_row is None:
-                    return str(row[field])
+                    value = row[field]
+
+                    if isinstance(value, (int, float)):
+                        return f"{float(value):.1f}"
+
+                    return str(value)
 
                 value = row[field]
                 prev = prev_row[field]
@@ -249,57 +380,84 @@ def render_ranged_weapons(df_ranged: pd.DataFrame):
                 if isinstance(value, str):
                     return diff_text_granular(value, prev, tier_color)
 
-                # valores simples → highlight normal
+                # números → round + highlight
+                if isinstance(value, (int, float)):
+                    value_fmt = f"{float(value):.1f}"
+                    prev_fmt = f"{float(prev):.1f}" if isinstance(prev, (int, float)) else prev
+
+                    if value_fmt != prev_fmt:
+                        return f"<span style='color:{tier_color}; font-weight:600'>{value_fmt}</span>"
+
+                    return value_fmt
+
+                # fallback
                 if value != prev:
                     return f"<span style='color:{tier_color}; font-weight:600'>{value}</span>"
 
                 return str(value)
 
-            # ---------- HEADER ----------
+            # -----------------------------
+            # HEADER
+            # -----------------------------
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(
-                    f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{row['weapon_tier']}</span>",
+                    f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{tier_map[selected_level]}</span>",
                     unsafe_allow_html=True
                 )
+
             with col2:
                 st.markdown(f"**Perícia:** {h('weapon_skill')}", unsafe_allow_html=True)
 
-
-            # ---------- CAMPOS ----------
+            # -----------------------------
+            # CAMPOS
+            # -----------------------------
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Modificador GDP:** {h('weapon_gdp_modifier')}", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Tempo de Recarga:** {h('weapon_reload_speed')}", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**TR:** {h('weapon_tr')}", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Prec:** {h('weapon_prec')}", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Peso:** {h('weapon_weight')} kg", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Comprimento:** {h('weapon_length')} m", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Preço:** {h('weapon_price')} moedas", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Preço da Munição:** {h('weapon_ammo_price')} moedas", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**ST Mínima:** {h('weapon_min_strength')}", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Tipos de Dano:** {h('weapon_damage_type')}", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Distância ½:** {h('weapon_half_distance')}", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Distância Max:** {h('weapon_max_distance')}", unsafe_allow_html=True)
 

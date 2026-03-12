@@ -12,7 +12,9 @@ from streamlit_option_menu import option_menu
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 # RELATIVE IMPORTS
-from app.utils import TIER_CONFIG, TIER_COLORS, TIER_ORDER
+from app.utils import TIER_CONFIG, TIER_COLORS, TIER_ORDER, TIER_NAME_SETS
+DEFAULT_TIER_SET = "qualidade"
+
 from app.src.data_loader import read_excel_data
 from app.components.filters import dynamic_filters, search_box, diff_text_granular
 
@@ -277,21 +279,38 @@ def get_row_by_tier(df: pd.DataFrame, tier: str):
         return None
     return filtered.iloc[0]
 
-def render_consumable_sub_page(df_consumables: pd.DataFrame, consumable_type: str):
+def render_consumable_sub_page(
+    df_consumables: pd.DataFrame,
+    consumable_type: str,
+    tier_set: str = DEFAULT_TIER_SET
+):
 
     df = df_consumables.copy()
     df = df.fillna('')
 
-    # normalização (boa prática)
-    df["consumable_tier"] = df["consumable_tier"].astype(str).str.strip()
+    tier_map = TIER_NAME_SETS[tier_set]
 
-    df["consumable_tier"] = pd.Categorical(
-        df["consumable_tier"],
+    # -----------------------------
+    # Converter nome do tier -> nível numérico
+    # -----------------------------
+    name_to_level = {v: k for k, v in tier_map.items()}
+
+    df["tier_level"] = (
+        df["consumable_tier"]
+        .astype(str)
+        .str.strip()
+        .map(name_to_level)
+    )
+
+    df["tier_level"] = pd.Categorical(
+        df["tier_level"],
         categories=TIER_ORDER,
         ordered=True
     )
 
-    # ordenar por menor id da poção
+    # -----------------------------
+    # ordenar por menor id
+    # -----------------------------
     order = (
         df.groupby("consumable_name")["consumable_id"]
         .min()
@@ -303,54 +322,87 @@ def render_consumable_sub_page(df_consumables: pd.DataFrame, consumable_type: st
 
         df_consumable = (
             df[df["consumable_name"] == consumable_name]
-            .sort_values("consumable_tier")
+            .sort_values("tier_level")
             .reset_index(drop=True)
         )
 
         with st.expander(consumable_name):
 
             tiers_available = [
-                t for t in TIER_ORDER
-                if t in df_consumable["consumable_tier"].astype(str).values
+                int(t)
+                for t in df_consumable["tier_level"]
+                .dropna()
+                .unique()
             ]
+
+            tiers_available = sorted(tiers_available)
 
             if not tiers_available:
                 st.warning("Sem tiers disponíveis")
                 continue
 
-            default_tier = "Comum" if "Comum" in tiers_available else tiers_available[0]
+            tier_labels = [tier_map[t] for t in tiers_available]
 
-            # botões
+            default_level = 1 if 1 in tiers_available else tiers_available[0]
+            default_label = tier_map[default_level]
+
+            # -----------------------------
+            # Controle de seleção
+            # -----------------------------
             try:
-                selected_tier = st.segmented_control(
+                selected_label = st.segmented_control(
                     "Tier",
-                    options=tiers_available,
-                    default=default_tier,
+                    options=tier_labels,
+                    default=default_label,
                     key=f"tier_segment_{consumable_name}"
                 )
             except Exception:
-                selected_tier = st.radio(
+                selected_label = st.radio(
                     "Tier",
-                    options=tiers_available,
-                    index=tiers_available.index(default_tier),
+                    options=tier_labels,
+                    index=tier_labels.index(default_label),
                     horizontal=True,
                     key=f"tier_radio_{consumable_name}"
                 )
 
-            row = get_row_by_tier(df_consumable, selected_tier)
-            if row is None:
+            selected_level = name_to_level[selected_label]
+
+            # -----------------------------
+            # Buscar linha selecionada
+            # -----------------------------
+            row = df_consumable[df_consumable["tier_level"] == selected_level]
+
+            if row.empty:
                 continue
 
+            row = row.iloc[0]
+
+            # -----------------------------
+            # tier anterior
+            # -----------------------------
             prev_row = None
-            idx = tiers_available.index(selected_tier)
+            idx = tiers_available.index(selected_level)
+
             if idx > 0:
-                prev_row = get_row_by_tier(df_consumable, tiers_available[idx - 1])
+                prev_level = tiers_available[idx - 1]
+                prev = df_consumable[df_consumable["tier_level"] == prev_level]
+                if not prev.empty:
+                    prev_row = prev.iloc[0]
 
-            tier_color = TIER_COLORS.get(str(row["consumable_tier"]), "#374151")
+            tier_color = TIER_COLORS.get(selected_level, "#374151")
 
+            # -----------------------------
+            # Highlight helper
+            # -----------------------------
             def h(field):
+
                 if prev_row is None:
-                    return str(row[field])
+                    value = row[field]
+
+                    if isinstance(value, (int, float)):
+                        return f"{float(value):.1f}"
+
+                    return str(value)
 
                 value = row[field]
                 prev = prev_row[field]
@@ -359,47 +411,73 @@ def render_consumable_sub_page(df_consumables: pd.DataFrame, consumable_type: st
                 if isinstance(value, str):
                     return diff_text_granular(value, prev, tier_color)
 
-                # valores simples → highlight normal
+                # números → round + highlight
+                if isinstance(value, (int, float)):
+                    value_fmt = f"{float(value):.1f}"
+                    prev_fmt = f"{float(prev):.1f}" if isinstance(prev, (int, float)) else prev
+
+                    if value_fmt != prev_fmt:
+                        return f"<span style='color:{tier_color}; font-weight:600'>{value_fmt}</span>"
+
+                    return value_fmt
+
+                # fallback
                 if value != prev:
                     return f"<span style='color:{tier_color}; font-weight:600'>{value}</span>"
 
                 return str(value)
 
-            # ---------- HEADER ----------
+            # -----------------------------
+            # HEADER
+            # -----------------------------
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(
-                    f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{row['consumable_tier']}</span>",
+                    f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{tier_map[selected_level]}</span>",
                     unsafe_allow_html=True
                 )
 
-            # ---------- CAMPOS ----------
+            # -----------------------------
+            # CAMPOS
+            # -----------------------------
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Categoria:** {h('consumable_category')}", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Duração:** {h('consumable_duration')}", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Efeito:** {h('consumable_effect')}", unsafe_allow_html=True)
+
             with col2:
+
                 if consumable_type in ("Poções", "Elixires"):
                     st.markdown(f"**Toxicidade:** {h('consumable_toxicity')}", unsafe_allow_html=True)
+
                 elif consumable_type in ("Venenos"):
                     st.markdown(f"**Métodos de Aplicação:** {h('consumable_method')}", unsafe_allow_html=True)
+
                 elif consumable_type in ("Bombas"):
                     st.markdown(f"**Área de Efeito:** {h('consumable_effect_area')}", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Preço:** {h('consumable_price')} moedas", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Peso:** {h('consumable_weight')} kg", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
                 st.markdown(f"**Descrição:**\n\n{h('consumable_description')}", unsafe_allow_html=True)
+
             with col2:
                 st.markdown(f"**Observação:**\n\n{h('consumable_observation')}", unsafe_allow_html=True)
 
