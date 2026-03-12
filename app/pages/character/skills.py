@@ -179,21 +179,19 @@ def skills_cost_in_points(df_dict: dict) -> None:
         df_sorted = df_overview.sort_values(by="skill_level")
 
         # Cabeçalho (fora do loop)
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3 = st.columns(3)
         col1.markdown("**Nível de Habilidade (NH)**")
         col2.markdown("**Nomenclatura do NH**")
         col3.markdown("**Descrição**")
-        col4.markdown("**Descrição quanto ao Combate**")
 
         st.divider()
 
         # Linhas
         for _, row in df_sorted.iterrows():
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3 = st.columns(3)
             col1.write(row["skill_level"])
             col2.write(row["skill_level_term"])
             col3.write(row["skill_level_description"])
-            col4.write(row["skill_level_observation"])
 
 # ------------------------------------------------------------------------------------------------ #
 #FUNÇÃO MAIN
