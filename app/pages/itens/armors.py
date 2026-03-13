@@ -29,7 +29,6 @@ def get_row_by_tier(df: pd.DataFrame, tier: str):
 
 def render_armor_page(
     df_armors: pd.DataFrame,
-    armor_type: str,
     tier_set: str = DEFAULT_TIER_SET
 ):
 
@@ -211,6 +210,189 @@ def render_armor_page(
 
             st.markdown(f"**Descrição:**\n\n{h('armor_description')}", unsafe_allow_html=True)
 
+def render_shield_page(
+    df_shields: pd.DataFrame,
+    tier_set: str = DEFAULT_TIER_SET
+):
+
+    df = df_shields.copy()
+    df = df.fillna('')
+
+    tier_map = TIER_NAME_SETS[tier_set]
+
+    # -----------------------------
+    # Converter nome -> nível
+    # -----------------------------
+    name_to_level = {v: k for k, v in tier_map.items()}
+
+    df["tier_level"] = (
+        df["shield_tier"]
+        .astype(str)
+        .str.strip()
+        .map(name_to_level)
+    )
+
+    df["tier_level"] = pd.Categorical(
+        df["tier_level"],
+        categories=TIER_ORDER,
+        ordered=True
+    )
+
+    # -----------------------------
+    # ordenar armaduras
+    # -----------------------------
+    order = (
+        df.groupby("shield_name")["shield_id"]
+        .min()
+        .sort_values()
+        .index
+    )
+
+    for shield_name in order:
+
+        df_shield = (
+            df[df["shield_name"] == shield_name]
+            .sort_values("tier_level")
+            .reset_index(drop=True)
+        )
+
+        with st.expander(shield_name):
+
+            tiers_available = [
+                int(t)
+                for t in df_shield["tier_level"]
+                .dropna()
+                .unique()
+            ]
+
+            tiers_available = sorted(tiers_available)
+
+            if not tiers_available:
+                st.warning("Sem tiers disponíveis")
+                continue
+
+            tier_labels = [tier_map[t] for t in tiers_available]
+
+            default_level = 1 if 1 in tiers_available else tiers_available[0]
+            default_label = tier_map[default_level]
+
+            # -----------------------------
+            # seleção de tier
+            # -----------------------------
+            try:
+                selected_label = st.segmented_control(
+                    "Tier",
+                    options=tier_labels,
+                    default=default_label,
+                    key=f"tier_segment_{shield_name}"
+                )
+            except Exception:
+                selected_label = st.radio(
+                    "Tier",
+                    options=tier_labels,
+                    index=tier_labels.index(default_label),
+                    horizontal=True,
+                    key=f"tier_radio_{shield_name}"
+                )
+
+            selected_level = name_to_level[selected_label]
+
+            # -----------------------------
+            # linha atual
+            # -----------------------------
+            row = df_shield[df_shield["tier_level"] == selected_level]
+
+            if row.empty:
+                continue
+
+            row = row.iloc[0]
+
+            # -----------------------------
+            # tier anterior
+            # -----------------------------
+            prev_row = None
+            idx = tiers_available.index(selected_level)
+
+            if idx > 0:
+                prev_level = tiers_available[idx - 1]
+                prev = df_shield[df_shield["tier_level"] == prev_level]
+
+                if not prev.empty:
+                    prev_row = prev.iloc[0]
+
+            tier_color = TIER_COLORS.get(selected_level, "#374151")
+
+            # -----------------------------
+            # highlight helper
+            # -----------------------------
+            def h(field):
+
+                if prev_row is None:
+                    value = row[field]
+
+                    if isinstance(value, (int, float)):
+                        return f"{float(value):.1f}"
+
+                    return str(value)
+
+                value = row[field]
+                prev = prev_row[field]
+
+                # textos longos → diff granular
+                if isinstance(value, str):
+                    return diff_text_granular(value, prev, tier_color)
+
+                # números → round + highlight
+                if isinstance(value, (int, float)):
+                    value_fmt = f"{float(value):.1f}"
+                    prev_fmt = f"{float(prev):.1f}" if isinstance(prev, (int, float)) else prev
+
+                    if value_fmt != prev_fmt:
+                        return f"<span style='color:{tier_color}; font-weight:600'>{value_fmt}</span>"
+
+                    return value_fmt
+
+                # fallback
+                if value != prev:
+                    return f"<span style='color:{tier_color}; font-weight:600'>{value}</span>"
+
+                return str(value)
+
+            # -----------------------------
+            # HEADER
+            # -----------------------------
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown(
+                    f"**Tier:** <span style='color:{tier_color}; font-weight:700'>{tier_map[selected_level]}</span>",
+                    unsafe_allow_html=True
+                )
+
+            with col2:
+                st.markdown(f"**Tipo:** {h('shield_type')}", unsafe_allow_html=True)
+
+            # -----------------------------
+            # CAMPOS
+            # -----------------------------
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown(f"**Pontos de Vida:** {h('shield_hit_points')}", unsafe_allow_html=True)
+
+            with col2:
+                st.markdown(f"**Resistência (DR):** {h('shield_damage_resistence')}", unsafe_allow_html=True)
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown(f"**Preço:** {h('shield_price')} moedas", unsafe_allow_html=True)
+
+            with col2:
+                st.markdown(f"**Peso:** {h('shield_weight')} kg", unsafe_allow_html=True)
+
+            st.markdown(f"**Descrição:**\n\n{h('shield_description')}", unsafe_allow_html=True)
+
 def render_armor_selection(df_armors: pd.DataFrame):
 
     st.subheader("Seleção de Armaduras", divider="grey")
@@ -314,7 +496,54 @@ def render_armor_selection(df_armors: pd.DataFrame):
 
     return pd.DataFrame(selected_rows)
 
-def render_build_summary(df_build: pd.DataFrame):
+def render_shield_selection(df_shields: pd.DataFrame):
+
+    st.subheader("Seleção de Escudo", divider="grey")
+
+    df = df_shields.copy()
+
+    df = df.sort_values(["shield_type", "shield_name"])
+
+    shield_names = df["shield_name"].unique().tolist()
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        shield_choice = st.selectbox(
+            "Escudo",
+            shield_names,
+            key="shield_select"
+        )
+
+    df_shield = df[df["shield_name"] == shield_choice]
+
+    tiers = df_shield["shield_tier"].tolist()
+
+    with col2:
+
+        tier_choice = st.selectbox(
+            "Tier",
+            tiers,
+            index=tiers.index("Comum") if "Comum" in tiers else 0,
+            key="shield_tier_select"
+        )
+
+    row = df_shield[df_shield["shield_tier"] == tier_choice].iloc[0]
+
+    stat1, stat2 = st.columns(2)
+
+    with stat1:
+        st.write(f"DR: **{row['shield_damage_resistence']}**")
+        st.write(f"HP: **{row['shield_hit_points']}**")
+
+    with stat2:
+        st.write(f"Peso: **{row['shield_weight']} kg**")
+        st.write(f"Preço: **{row['shield_price']}**")
+
+    return row
+
+def render_build_summary(df_build: pd.DataFrame, shield_row=None):
 
     if df_build.empty:
         return
@@ -324,6 +553,11 @@ def render_build_summary(df_build: pd.DataFrame):
     total_weight = df_build["armor_weight"].sum()
     total_price = df_build["armor_price"].sum()
     total_dr = df_build["armor_damage_resistence"].sum()
+
+    if shield_row is not None:
+        total_weight += shield_row["shield_weight"]
+        total_price += shield_row["shield_price"]
+        total_dr += shield_row["shield_damage_resistence"]
 
     col1, col2, col3 = st.columns(3)
 
@@ -351,6 +585,19 @@ def render_build_summary(df_build: pd.DataFrame):
             "armor_price": "Preço"
         })
     )
+
+    if shield_row is not None:
+
+        shield_df = pd.DataFrame([{
+            "Slot": "Escudo",
+            "Armadura": shield_row["shield_name"],
+            "Tier": shield_row["shield_tier"],
+            "DR": shield_row["shield_damage_resistence"],
+            "Peso (kg)": shield_row["shield_weight"],
+            "Preço": shield_row["shield_price"]
+        }])
+
+        df_view = pd.concat([df_view, shield_df], ignore_index=True)
 
     st.dataframe(
         df_view,
@@ -384,18 +631,41 @@ def armors(df_dict: dict) -> None:
     st.markdown("***")
 
     # Função de visualização
-    render_armor_page(df, "Armaduras")
+    render_armor_page(df)
 
 def armor_build(df_dict):
 
     st.header("Montar Conjunto de Armadura", divider="grey")
 
     df_armors = df_dict["armors"].copy()
+    df_shields = df_dict["shields"].copy()
 
     with st.expander("Seleção de armadura por slot e tier"):
         df_build = render_armor_selection(df_armors)
 
-    render_build_summary(df_build)
+    st.markdown("### Escudo")
+
+    use_shield = st.checkbox("Adicionar escudo")
+
+    shield_row = None
+
+    if use_shield:
+
+        with st.expander("Seleção de escudo"):
+            shield_row = render_shield_selection(df_shields)
+
+    render_build_summary(df_build, shield_row)
+
+def shields(df_dict: dict) -> None:
+    """Armaduras"""
+
+    df_shields = df_dict["shields"]
+
+    st.header("Escudos", divider="grey")
+
+    # Função de visualização
+    render_shield_page(df_shields)
+
 
 # ------------------------------------------------------------------------------------------------ #
 #FUNÇÃO MAIN
@@ -404,7 +674,7 @@ def main():
 
     df_dict = read_excel_data('armors.xlsx')
 
-    options = ["Armaduras", "Montar Build"]
+    options = ["Armaduras", "Escudos", "Montar Build", ]
 
     with st.sidebar:
         st.markdown("### Navegação")
@@ -418,6 +688,9 @@ def main():
         armors(df_dict)
 
     if selection == options[1]:
+        shields(df_dict)
+
+    if selection == options[2]:
         armor_build(df_dict)
 
 # ------------------------------------------------------------------------------------------------ #
